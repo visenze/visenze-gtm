@@ -1,0 +1,7 @@
+# Refer to https://developers.google.com/tag-platform/tag-manager/templates/gallery#update_your_template for updating this file
+homepage: "https://www.visenze.com"
+documentation: "https://ref-docs.visenze.com/reference/widget-setup"
+versions:
+  # Older versions
+  - sha: 
+    changeNotes: Initial release.
