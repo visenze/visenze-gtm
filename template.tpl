@@ -1,4 +1,12 @@
-﻿___INFO___
+﻿___TERMS_OF_SERVICE___
+
+By creating or modifying this file you agree to Google Tag Manager's Community
+Template Gallery Developer Terms of Service available at
+https://developers.google.com/tag-manager/gallery-tos (or such other URL as
+Google may provide), as modified from time to time.
+
+
+___INFO___
 
 {
   "type": "TAG",
@@ -10,7 +18,7 @@
     "id": "brand_dummy",
     "displayName": ""
   },
-  "description": "Deploy ViSenze solutions via GTM, enabling users in bypassing any development resources, launch and test ViSenze solutions as fast as possible.\n\nTODO: Gallery TOS not accepted yet",
+  "description": "Deploy ViSenze solutions via GTM, enabling users in bypassing any development resources, launch and test ViSenze solutions as fast as possible.",
   "containerContexts": [
     "WEB"
   ]
@@ -268,15 +276,15 @@ const validateFnInit = (fn) => {
 
 const sendWidgetEvent = (eventName, body) => {
   const storedEvent = JSON.parse(localStorage.getItem(LAST_CLICK_REF)) || {};
+  log('storedEvent=', storedEvent);
+
   if (!(storedEvent && storedEvent.queryId && storedEvent.pid)) {
     log('Unable to retrieve last clicked widget for event: ', eventName);
     data.gtmOnFailure();
     return;
   }
 
-  const placementId = storedEvent.pid;
   body.queryId = storedEvent.queryId;
-
 
   // initialize visenzeLayer if not available
   const vsLayerRef = copyFromWindow(VS_LAYER_REF);
@@ -287,7 +295,7 @@ const sendWidgetEvent = (eventName, body) => {
   const vsLayerPushMethod = VS_LAYER_REF + '.push';
   const vsLayerBody = {
     action: 'send',
-    placementId: placementId,
+    placementId: storedEvent.pid,
     params: [eventName, body],
   };
   callInWindow(vsLayerPushMethod, vsLayerBody);
@@ -926,7 +934,7 @@ ___WEB_PERMISSIONS___
                   },
                   {
                     "type": 8,
-                    "boolean": false
+                    "boolean": true
                   }
                 ]
               }
@@ -970,6 +978,18 @@ ___WEB_PERMISSIONS___
 
 ___TESTS___
 
+scenarios: []
+setup: "const localStorage = require('localStorage');\nconst json = require('JSON');\n\
+  \nconst DATA_LAYER_WINDOW_FIELD = 'dataLayer';\nconst LAST_CLICK_REF = 'visenze_widget_last_click';\n\
+  \nconst transactionData = {\n  transactionId: '1234',\n  transactionAffiliation:\
+  \ 'Acme Clothing',\n  transactionTotal: 38.26, \n  transactionTax: 1.29,\n  transactionShipping:\
+  \ 5,\n  transactionProducts: [\n    {\n      sku: 'DD44',\n      name: 'T-Shirt',\n\
+  \      category: 'Apparel',\n      price: 11.99,  \n      quantity: 1 \n    },\n\
+  \    {\n      sku: 'AA1243544',\n      name: 'Socks',\n      category: 'Apparel',\n\
+  \      price: 9.99,\n      quantity: 2\n    }\n  ]\n};\n\nconst productIdData =\
+  \ {\n  'Product_SKU': 'product_123',\n};\n\nconst lastClickedEvent = {\n  queryId:\
+  \ 'xxx',\n  placement_id: 123,\n};\n\n// set LocalStorage permission for LAST_CLICKED_REF\
+  \ to r/w before starting tests\nlocalStorage.setItem(LAST_CLICK_REF, json.stringify(lastClickedEvent));\n"
 
 
 ___NOTES___
