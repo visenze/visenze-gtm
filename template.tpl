@@ -32,17 +32,6 @@ ___TEMPLATE_PARAMETERS___
     ]
   },
   {
-    "type": "TEXT",
-    "name": "placementId",
-    "displayName": "placementId (To be removed with upcoming feature)",
-    "simpleValueType": true,
-    "valueValidators": [
-      {
-        "type": "POSITIVE_NUMBER"
-      }
-    ]
-  },
-  {
     "type": "SELECT",
     "name": "integrationType",
     "displayName": "Integration Type",
@@ -80,25 +69,6 @@ ___TEMPLATE_PARAMETERS___
       }
     ],
     "help": "e.g. ecommerce.items.0.item_id"
-  },
-  {
-    "type": "TEXT",
-    "name": "cssSelector",
-    "displayName": "CSS Selector (To be removed with upcoming feature)",
-    "simpleValueType": true,
-    "valueValidators": [
-      {
-        "type": "NON_EMPTY"
-      }
-    ],
-    "help": "e.g. \u0027.vsr-embedded-oos\u0027",
-    "enablingConditions": [
-      {
-        "paramName": "integrationType",
-        "paramValue": "widget",
-        "type": "EQUALS"
-      }
-    ]
   },
   {
     "type": "SELECT",
@@ -144,6 +114,24 @@ ___TEMPLATE_PARAMETERS___
         "type": "EQUALS"
       }
     ]
+  },
+  {
+    "type": "RADIO",
+    "name": "appType",
+    "displayName": "App Type",
+    "radioItems": [
+      {
+        "value": "sbi",
+        "displayValue": "Search"
+      },
+      {
+        "value": "vsr",
+        "displayValue": "Recommendations"
+      }
+    ],
+    "simpleValueType": true,
+    "defaultValue": "sbi",
+    "help": "Search or Recommendations Widget"
   }
 ]
 
@@ -168,22 +156,43 @@ const injectScript = require('injectScript');
 const callInWindow = require('callInWindow');
 const copyFromWindow = require('copyFromWindow');
 const setInWindow = require('setInWindow');
+const getUrl = require('getUrl');
 const getContainerVersion = require('getContainerVersion');
 const copyFromDataLayer = require('copyFromDataLayer');
+const getQueryParameters = require('getQueryParameters');
 
-const SCRIPT_VERSION = '0.1';
+const SCRIPT_VERSION = '0.1.0';
 const CONTAINER_VERSION = getContainerVersion();
-const ATTR_TO_SELECT = 'data-pid';
-// TODO: confirm stored format for Last Clicked event in Localstorage following ES-5475 implementation
-const LAST_CLICK_REF = 'vs_last_clicked_result';
-const WIDGET_EVENT_REF = 'vsWidgetsFn';
-// TODO: hide data.env field from Production GTM template after POC
-const env = CONTAINER_VERSION.environmentName === 'production' || data.env === 'production' ? 'production' : 'staging';
 
-// TODO: update script URL after ES-5474 implementation
+const VS_LAYER_REF = 'visenzeLayer';
+const LAST_CLICK_REF = 'visenze_widget_last_click';
+const APP_DEPLOY_CONFIGS_REF = 'visenzeAppDeployConfigs';
+const WIDGET_PID_REF = 'visenzeWidgetsPid';
+
+const env = CONTAINER_VERSION.environmentName === 'production' || data.env === 'production' ? 'production' : 'staging';
+const appType = data.appType;
+
 const paramsMap = {
-  staging: 'https://cdn.visenze.com/widgets/dist/js/productsearch/staging/vsr_embedded.staging.js',
-  production: 'https://cdn.visenze.com/widgets/dist/js/productsearch/vsr_embedded.2.0.1.js',
+  staging: {
+    sbi: {
+      widgetUrl: 'https://cdn-staging.visenze.com/widgets/dist/js/productsearch/staging/staging.deploy_script.2.0.3.js',
+      analyticsUrl: 'https://search-dev.visenze.com',
+    },
+    vsr: {
+      widgetUrl: 'https://cdn-staging.visenze.com/widgets/dist/js/productsearch/staging/staging.deploy_script.2.0.3.js',
+      analyticsUrl: 'https://search-dev.visenze.com',
+    },
+  },
+  production: {
+    sbi: {
+      widgetUrl: 'https://cdn.visenze.com/widgets/dist/js/productsearch/vsr_embedded.2.0.1.js',
+      analyticsUrl: 'https://search-dev.visenze.com',
+    },
+    vsr: {
+      widgetUrl: 'https://cdn.visenze.com/widgets/dist/js/productsearch/vsr_embedded.2.0.1.js',
+      analyticsUrl: 'https://search-dev.visenze.com',
+    },
+  },
 };
 
 
@@ -236,9 +245,8 @@ const getProductId = () => {
   return getFromDataLayers(dataLayerArr, getProductIdByNestedKey, objKeys);
 };
 
-
 const productId = getProductId();
-if (!productId) {
+if (data.integrationType !== 'widget' && !productId) {
   log('event not triggered, event =', data.event, ', integration type =', data.integrationType);
   data.gtmOnSuccess();
   return;
@@ -258,90 +266,68 @@ const validateFnInit = (fn) => {
 };
 
 
-/**
- * TODO: since GTM layer is unable to read widget objects,
- * this method assumes there exists a @function vsWidgetsFn on the window layer,
- * which sends event to correct widget.
- *
- * Mock implementation of vsWidgetsFn / vsWidgets via Console:
-
-const w1 = initVSRembedded({appSettings: {appKey: 'xxx', placementId: xxx}, displaySettings: {vsrSelector: '.ps-vsr-widget-embedded-334'}, onTrackingCallback: (action, params) => {console.log('onTrackingCallback: ', action, params);}});
-w1.then((w) => {
-  window.vsWidgets = [w];
-  window.vsWidgetsFn = (appKey, placementId, eventName, body) => {
-    // assuming all widgets are stored under vsWidgets variable
-
-    const w = window.vsWidgets.find((widget) => (widget.settings.appKey === appKey && widget.settings.placementId === placementId));
-    if (!w) { return null; }
-    w.send(eventName, body);
-    return 'ok';
-  };
-});
-
- *
- */
 const sendWidgetEvent = (eventName, body) => {
-  // TODO: remove log
-  log('eventName=', eventName, ', body=', body);
-  const vsWidgets = copyFromWindow('vsWidgets');
-  log('vsWidgets=', vsWidgets);
-
-  // TODO: remove if doesn't work
-  if (vsWidgets) {
-    for (const w in vsWidgets) {
-      if (w && w.send) {
-        log('iterating through vsWidgets, widget=', w);
-        w.send(eventName, body);
-      }
-    }
-  }
-
-  // TODO: add localStorage Read perms for key after ES-5475 implementation
   const storedEvent = JSON.parse(localStorage.getItem(LAST_CLICK_REF)) || {};
-
   if (!(storedEvent && storedEvent.queryId && storedEvent.pid)) {
     log('Unable to retrieve last clicked widget for event: ', eventName);
     data.gtmOnFailure();
     return;
   }
 
+  const placementId = storedEvent.pid;
   body.queryId = storedEvent.queryId;
-  body.placement_id = storedEvent.pid;
 
-  const val = callInWindow(WIDGET_EVENT_REF, data.appKey, storedEvent.pid, eventName, body);
-  log('vsWidgetsFn return value:', val);
 
-  data.gtmOnSuccess();
+  // initialize visenzeLayer if not available
+  const vsLayerRef = copyFromWindow(VS_LAYER_REF);
+  if (!vsLayerRef) {
+    setInWindow(VS_LAYER_REF, []);
+  }
+  // call visenzeLayer.push method, with event
+  const vsLayerPushMethod = VS_LAYER_REF + '.push';
+  const vsLayerBody = {
+    action: 'send',
+    placementId: placementId,
+    params: [eventName, body],
+  };
+  callInWindow(vsLayerPushMethod, vsLayerBody);
 };
 
 
 const initWidget = () => {
-  const config = {
-    appSettings: {
-      appKey: data.appKey,
-      // TODO: remove after ES-5474 implementation
-      placementId: data.placementId,
-    },
-    // TODO: hard-coded configs, to be removed with ES-5474
-    // for now, use this to bind widget to <div class="vsr-embedded-oos"> element
-    // that has been manually injected in the DOM
-    displaySettings: {
-      vsrSelector: data.cssSelector,
-    },
-  };
+  const appKey = data.appKey;
+  let deployScriptUrl = paramsMap[env][appType].analyticsUrl + '/v1/deploy-configs?app_key=' + appKey + '&gtm_deploy=true';
 
-  // Dev test on widget https://dashboard-v2-staging-bz.visenze.com/302/recommendations/app/2009/placement/2731/widget-integrate
-  // TODO: staging/production widget URL, based on environment
-  const widgetUrl = paramsMap[env];
+  const previewId = getQueryParameters('visenzePreviewId');
+  if (previewId) {
+    deployScriptUrl = deployScriptUrl + '&preview_id=' + previewId; 
+  }
+  const debugId = getQueryParameters('visenzeDebugId');
+  if (previewId) {
+    deployScriptUrl = deployScriptUrl + '&debug_id=' + debugId; 
+  }
+
+  const widgetUrl = paramsMap[env][appType].widgetUrl;
 
   const successFn = () => {
     log('successfully loaded widget');
-    // TODO: confirm new method name for initializing widget(s) following ES-5475 implementation
-    const fn = 'initVSRembedded';
-    validateFnInit(fn);
-    callInWindow(fn, config);
-    // Call data.gtmOnSuccess when the tag is finished.
-    data.gtmOnSuccess();
+
+    // initialize visenzeLayer if it does not exist
+    const vsLayer = copyFromWindow(VS_LAYER_REF);
+    if (!vsLayer) {
+      setInWindow(VS_LAYER_REF, []);
+    }
+
+    const deploySuccessFn = () => {
+      // Call data.gtmOnSuccess when the tag is done deploying script.
+      data.gtmOnSuccess();
+    };
+    const deployFailureFn = () => {
+      log('unable to load deploy script, url=', deployScriptUrl, ', id=', previewId);
+      data.gtmOnFailure();
+    };
+
+    injectScript(deployScriptUrl, deploySuccessFn, deployFailureFn, deployScriptUrl);
   };
 
   const failureFn = () => {
@@ -349,28 +335,42 @@ const initWidget = () => {
     data.gtmOnFailure();
   };
 
+  setInWindow(WIDGET_PID_REF, productId);
   injectScript(widgetUrl, successFn, failureFn, widgetUrl);
 };
 
 
+const shouldSendEvent = () => {
+  const appDeployConfigs = copyFromWindow(APP_DEPLOY_CONFIGS_REF);
+  const deployType = appDeployConfigs && appDeployConfigs[data.appKey] && appDeployConfigs[data.appKey].deploy_type_id;
+  return deployType === 1 || deployType === '1';
+};
+
+
 const sendAtcEvent = () => {
-  const EVENT_NAME = 'add_to_cart';
-  sendWidgetEvent(EVENT_NAME, { product_id: productId });
+  if (shouldSendEvent()) {
+    const EVENT_NAME = 'add_to_cart';
+    sendWidgetEvent(EVENT_NAME, { pid: productId });
+  } else {
+    data.gtmOnFailure();
+  }
 };
 
 
 const sendTransactionEvent = () => {
-  const EVENT_NAME = 'transaction';
+  if (shouldSendEvent()) {
+    const EVENT_NAME = 'transaction';
+    const dataLayerArr = copyFromWindow('dataLayer');
+    const orderValueKeys = data.orderValueFieldName.split('.');
+    const orderValue = getFromDataLayers(dataLayerArr, getProductIdByNestedKey, orderValueKeys);
 
-  const dataLayerArr = copyFromWindow('dataLayer');
-  const orderValueKeys = data.orderValueFieldName.split('.');
-  const orderValue = getFromDataLayers(dataLayerArr, getProductIdByNestedKey, orderValueKeys);
-
-  sendWidgetEvent(EVENT_NAME, { product_id: productId, order_value: orderValue });
+    sendWidgetEvent(EVENT_NAME, { pid: productId, order_value: orderValue });
+  } else {
+    data.gtmOnFailure();
+  }
 };
 
 
-// TODO: Code supports integration with VSR embedded widget only, as of ES-5393, until ES-5474 implementation is done
 switch (data.integrationType) {
   case 'widget': return initWidget();
   case 'event.atc': return sendAtcEvent();
@@ -555,45 +555,6 @@ ___WEB_PERMISSIONS___
                 "mapValue": [
                   {
                     "type": 1,
-                    "string": "initVSRpopup"
-                  },
-                  {
-                    "type": 8,
-                    "boolean": true
-                  },
-                  {
-                    "type": 8,
-                    "boolean": false
-                  },
-                  {
-                    "type": 8,
-                    "boolean": true
-                  }
-                ]
-              },
-              {
-                "type": 3,
-                "mapKey": [
-                  {
-                    "type": 1,
-                    "string": "key"
-                  },
-                  {
-                    "type": 1,
-                    "string": "read"
-                  },
-                  {
-                    "type": 1,
-                    "string": "write"
-                  },
-                  {
-                    "type": 1,
-                    "string": "execute"
-                  }
-                ],
-                "mapValue": [
-                  {
-                    "type": 1,
                     "string": "dataLayer"
                   },
                   {
@@ -633,7 +594,7 @@ ___WEB_PERMISSIONS___
                 "mapValue": [
                   {
                     "type": 1,
-                    "string": "initVSRembedded"
+                    "string": "visenzeWidgets"
                   },
                   {
                     "type": 8,
@@ -672,46 +633,7 @@ ___WEB_PERMISSIONS___
                 "mapValue": [
                   {
                     "type": 1,
-                    "string": "vsWidgetsFn"
-                  },
-                  {
-                    "type": 8,
-                    "boolean": true
-                  },
-                  {
-                    "type": 8,
-                    "boolean": true
-                  },
-                  {
-                    "type": 8,
-                    "boolean": true
-                  }
-                ]
-              },
-              {
-                "type": 3,
-                "mapKey": [
-                  {
-                    "type": 1,
-                    "string": "key"
-                  },
-                  {
-                    "type": 1,
-                    "string": "read"
-                  },
-                  {
-                    "type": 1,
-                    "string": "write"
-                  },
-                  {
-                    "type": 1,
-                    "string": "execute"
-                  }
-                ],
-                "mapValue": [
-                  {
-                    "type": 1,
-                    "string": "vsLastClickEvent"
+                    "string": "visenzeAppDeployConfigs"
                   },
                   {
                     "type": 8,
@@ -750,7 +672,7 @@ ___WEB_PERMISSIONS___
                 "mapValue": [
                   {
                     "type": 1,
-                    "string": "vsWidgets"
+                    "string": "visenzeLayer"
                   },
                   {
                     "type": 8,
@@ -763,6 +685,84 @@ ___WEB_PERMISSIONS___
                   {
                     "type": 8,
                     "boolean": true
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "visenzeLayer.push"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "visenzeWidgetsPid"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
                   }
                 ]
               }
@@ -790,7 +790,7 @@ ___WEB_PERMISSIONS___
             "listItem": [
               {
                 "type": 1,
-                "string": "https://cdn.visenze.com/"
+                "string": "https://*.visenze.com/"
               }
             ]
           }
@@ -867,6 +867,68 @@ ___WEB_PERMISSIONS___
                     "boolean": true
                   }
                 ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "vs_last_clicked_result"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "visenze_widget_last_click"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  }
+                ]
               }
             ]
           }
@@ -877,116 +939,41 @@ ___WEB_PERMISSIONS___
       "isEditedByUser": true
     },
     "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "get_url",
+        "versionId": "1"
+      },
+      "param": [
+        {
+          "key": "urlParts",
+          "value": {
+            "type": 1,
+            "string": "any"
+          }
+        },
+        {
+          "key": "queriesAllowed",
+          "value": {
+            "type": 1,
+            "string": "any"
+          }
+        }
+      ]
+    },
+    "isRequired": true
   }
 ]
 
 
 ___TESTS___
 
-scenarios:
-- name: testTransactionEvent_multipleProductIds
-  code: |-
-    const mockData = {
-      appKey: 'asdf',
-      placementId: '1234',
-      integrationType: 'event.trans',
-      productIdFieldName: 'Product_SKU',
-      orderValueFieldName: 'transactionProducts.0.sku',
-    };
-
-    const dataLayers = [productIdData, transactionData];
-
-    mock('copyFromWindow', function (windowVar) {
-      switch (windowVar) {
-        case DATA_LAYER_WINDOW_FIELD: return dataLayers;
-        default: return null;
-      }
-    });
-
-    runCode(mockData);
-
-    const widgetEventValue = {
-      product_id: 'product_123',
-      order_value: 'DD44,AA1243544',
-    };
-
-    assertApi('gtmOnSuccess').wasCalled();
-    assertApi('copyFromWindow').wasCalledWith(DATA_LAYER_WINDOW_FIELD);
-- name: testAtcEvent
-  code: |-
-    const mockData = {
-      appKey: 'asdf',
-      placementId: '1234',
-      integrationType: 'event.atc',
-      productIdFieldName: 'Product_SKU',
-    };
-
-    const dataLayers = [productIdData];
-
-    mock('copyFromWindow', function (windowVar) {
-      switch (windowVar) {
-        case DATA_LAYER_WINDOW_FIELD: return dataLayers;
-        default: return null;
-      }
-    });
-
-    runCode(mockData);
-
-    assertApi('gtmOnSuccess').wasCalled();
-    assertApi('copyFromWindow').wasCalledWith(DATA_LAYER_WINDOW_FIELD);
-- name: testWidgetEvent
-  code: |-
-    const INIT_WIDGET_FN = 'initVSRembedded';
-    const mockData = {
-      appKey: 'asdf',
-      placementId: '1234',
-      integrationType: 'widget',
-      productIdFieldName: 'Product_SKU',
-      cssSelector: '.vsr-embedded-oos',
-    };
-
-    const dataLayers = [productIdData];
-    const config = {
-      appSettings: {
-        appKey: mockData.appKey,
-        placementId: mockData.placementId,
-      },
-      displaySettings: {
-        vsrSelector: mockData.cssSelector,
-      },
-    };
-    const mockWidget = {};
-
-    mock('copyFromWindow', function (windowVar) {
-      switch (windowVar) {
-        case DATA_LAYER_WINDOW_FIELD: return dataLayers;
-        case INIT_WIDGET_FN: return (() => ({}));
-        default: return null;
-      }
-    });
-
-    runCode(mockData);
-
-    assertApi('gtmOnSuccess').wasCalled();
-    assertApi('copyFromWindow').wasCalledWith(DATA_LAYER_WINDOW_FIELD);
-    assertApi('copyFromWindow').wasCalledWith(INIT_WIDGET_FN);
-    assertApi('callInWindow').wasCalledWith(INIT_WIDGET_FN, config);
-    assertApi('setInWindow').wasCalled();
-setup: "const localStorage = require('localStorage');\nconst json = require('JSON');\n\
-  \nconst DATA_LAYER_WINDOW_FIELD = 'dataLayer';\nconst LAST_CLICK_REF = 'vsLastClickEvent';\n\
-  \nconst transactionData = {\n  transactionId: '1234',\n  transactionAffiliation:\
-  \ 'Acme Clothing',\n  transactionTotal: 38.26, \n  transactionTax: 1.29,\n  transactionShipping:\
-  \ 5,\n  transactionProducts: [\n    {\n      sku: 'DD44',\n      name: 'T-Shirt',\n\
-  \      category: 'Apparel',\n      price: 11.99,  \n      quantity: 1 \n    },\n\
-  \    {\n      sku: 'AA1243544',\n      name: 'Socks',\n      category: 'Apparel',\n\
-  \      price: 9.99,\n      quantity: 2\n    }\n  ]\n};\n\nconst productIdData =\
-  \ {\n  'Product_SKU': 'product_123',\n};\n\nconst lastClickedEvent = {\n  queryId:\
-  \ 'xxx',\n  placement_id: 123,\n};\n\n// set LocalStorage permission for LAST_CLICKED_REF\
-  \ to r/w before starting tests\nlocalStorage.setItem(LAST_CLICK_REF, json.stringify(lastClickedEvent));\n"
 
 
 ___NOTES___
 
-Created on 12/08/2022, 14:37:37
+Created on 04/10/2022, 10:50:22
 
 
