@@ -3,5 +3,5 @@ homepage: "https://www.visenze.com"
 documentation: "https://ref-docs.visenze.com/reference/widget-setup"
 versions:
   # Latest version
-  - sha: 36bf590e6dc0c90828bbfba42a7386df3a9cc1f3
+  - sha: cebf219e0dd4cadc120ac480180e0957d862b4de
     changeNotes: Initial release.
