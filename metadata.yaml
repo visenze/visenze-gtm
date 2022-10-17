@@ -3,5 +3,8 @@ homepage: "https://www.visenze.com"
 documentation: "https://ref-docs.visenze.com/reference/widget-setup"
 versions:
   # Latest version
+  - sha: d09c08102877c5132626f3e17b1a652e64af068c
+    changeNotes: Fix integration with Checkout event, fix templating
+  # Older versions
   - sha: cebf219e0dd4cadc120ac480180e0957d862b4de
     changeNotes: Initial release.
