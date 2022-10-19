@@ -3,6 +3,8 @@ homepage: "https://www.visenze.com"
 documentation: "https://ref-docs.visenze.com/reference/widget-setup"
 versions:
   # Latest version
+  - sha: 7588fa5d547f3e1351f0bc5bfaeb5b328a59fb0d
+    changeNotes: Skip fetching of widget prior to deploy-configs, add template for staging
   - sha: 282d8c6e8b9e585d340d438db7a8c81b8cfc719d
     changeNotes: Fix endpoints, debug preview for production deploy script
   # Older versions
