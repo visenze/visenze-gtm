@@ -1,12 +1,4 @@
-﻿___TERMS_OF_SERVICE___
-
-By creating or modifying this file you agree to Google Tag Manager's Community
-Template Gallery Developer Terms of Service available at
-https://developers.google.com/tag-manager/gallery-tos (or such other URL as
-Google may provide), as modified from time to time.
-
-
-___INFO___
+﻿___INFO___
 
 {
   "type": "TAG",
@@ -199,6 +191,32 @@ ___TEMPLATE_PARAMETERS___
         "type": "EQUALS"
       }
     ]
+  },
+  {
+    "type": "GROUP",
+    "name": "toRemove",
+    "displayName": "To Remove",
+    "groupStyle": "NO_ZIPPY",
+    "subParams": []
+  },
+  {
+    "type": "SELECT",
+    "name": "env",
+    "displayName": "Environment (To Remove)",
+    "macrosInSelect": false,
+    "selectItems": [
+      {
+        "value": "production",
+        "displayValue": "Production"
+      },
+      {
+        "value": "staging",
+        "displayValue": "Staging"
+      }
+    ],
+    "simpleValueType": true,
+    "help": "Temporary variable to control widget env (staging / production)",
+    "defaultValue": "staging"
   }
 ]
 
