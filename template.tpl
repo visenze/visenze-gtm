@@ -1,4 +1,4 @@
-﻿___TERMS_OF_SERVICE___
+___TERMS_OF_SERVICE___
 
 By creating or modifying this file you agree to Google Tag Manager's Community
 Template Gallery Developer Terms of Service available at
@@ -234,10 +234,9 @@ const LAST_CLICK_REF = 'visenze_widget_last_click';
 const APP_DEPLOY_CONFIGS_REF = 'visenzeAppDeployConfigs';
 const WIDGET_PID_REF = 'visenzeWidgetsPid';
 
-const env = CONTAINER_VERSION.environmentName === 'production' || data.env === 'production' ? 'production' : 'staging';
+const env = CONTAINER_VERSION.environmentName === 'staging' || data.env === 'staging' ? 'staging' : 'production';
 const appType = 'vsr';
 
-// TODO: update script URL for production
 const paramsMap = {
   staging: {
     sbi: {
@@ -251,12 +250,12 @@ const paramsMap = {
   },
   production: {
     sbi: {
-      widgetUrl: 'https://cdn.visenze.com/widgets/dist/js/productsearch/vsr_embedded.2.0.1.js',
-      analyticsUrl: 'https://search-dev.visenze.com',
+      widgetUrl: 'https://cdn.visenze.com/widgets/dist/js/productsearch/production/production.deploy_script.3.0.0.js',
+      analyticsUrl: 'https://search.visenze.com',
     },
     vsr: {
-      widgetUrl: 'https://cdn.visenze.com/widgets/dist/js/productsearch/vsr_embedded.2.0.1.js',
-      analyticsUrl: 'https://search-dev.visenze.com',
+      widgetUrl: 'https://cdn.visenze.com/widgets/dist/js/productsearch/production/production.deploy_script.3.0.0.js',
+      analyticsUrl: 'https://search.visenze.com',
     },
   },
 };
@@ -313,7 +312,7 @@ const logWithError = (msgObj) => {
 const getFromDataLayers = (dataLayerArr, eventName, fn, fnArgs) => {
   for (const dl of dataLayerArr) {
     // if eventName is specified, find trigger event by comparing gtmEventId with dataLayer
-    if (eventName && dl['gtm.uniqueEventId'] !== data.gtmEventId) {
+    if (!dl || (eventName && dl['gtm.uniqueEventId'] !== data.gtmEventId)) {
       continue;
     }
 
@@ -327,6 +326,10 @@ const getFromDataLayers = (dataLayerArr, eventName, fn, fnArgs) => {
 };
 
 const getFieldByNestedKey = (dl, keys) => {
+  if (!dl) {
+    return '';
+  }
+
   let productId = '';
   const key = keys[0];
 
@@ -376,7 +379,7 @@ const initWidget = () => {
     deployScriptUrl = deployScriptUrl + '&preview_id=' + previewId; 
   }
   const debugId = getQueryParameters('visenzeDebugId');
-  if (previewId) {
+  if (debugId) {
     deployScriptUrl = deployScriptUrl + '&debug_id=' + debugId; 
   }
 
@@ -482,7 +485,7 @@ const sendTransactionEventForProductArr = (productArr) => {
 
   for (const productEl of productArr) {
     const pidField = data.transProductArrSkuField;
-    const pid = productEl[pidField];
+    const pid = productEl && productEl[pidField];
     if (!pid) {
       logWithError({ msg: 'unable to find productId in product', field: pidField, product: productEl });
       continue;
