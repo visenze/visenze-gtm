@@ -46,10 +46,6 @@ ___TEMPLATE_PARAMETERS___
       {
         "value": "event.trans",
         "displayValue": "Enable Transaction Events Tracking"
-      },
-      {
-        "value": "event.pv",
-        "displayValue": "Enable Product Page View Tracking"
       }
     ],
     "simpleValueType": true,
@@ -172,30 +168,6 @@ ___TEMPLATE_PARAMETERS___
       {
         "paramName": "integrationType",
         "paramValue": "event.trans",
-        "type": "EQUALS"
-      }
-    ]
-  },
-  {
-    "type": "GROUP",
-    "name": "pvSettings",
-    "displayName": "Product Page View Tracking Settings",
-    "groupStyle": "NO_ZIPPY",
-    "subParams": [
-      {
-        "type": "TEXT",
-        "name": "pvPid",
-        "displayName": "GTM variable for ProductId",
-        "simpleValueType": true,
-        "valueHint": "e.g. ecommerce.items.0.item_id",
-        "help": "Select the GTM variable that represents product id of the current PDP page.",
-        "valueValidators": []
-      }
-    ],
-    "enablingConditions": [
-      {
-        "paramName": "integrationType",
-        "paramValue": "event.pv",
         "type": "EQUALS"
       }
     ]
