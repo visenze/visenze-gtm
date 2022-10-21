@@ -3,11 +3,13 @@ homepage: "https://www.visenze.com"
 documentation: "https://ref-docs.visenze.com/reference/widget-setup"
 versions:
   # Latest version
+  - sha: f2485aecddc58fae6a06b5698d7ed05d9e75665f
+    changeNotes: remove Product Page view integration option
+  # Older versions
   - sha: 7588fa5d547f3e1351f0bc5bfaeb5b328a59fb0d
     changeNotes: Skip fetching of widget prior to deploy-configs, add template for staging
   - sha: 282d8c6e8b9e585d340d438db7a8c81b8cfc719d
     changeNotes: Fix endpoints, debug preview for production deploy script
-  # Older versions
   - sha: d09c08102877c5132626f3e17b1a652e64af068c
     changeNotes: Fix integration with Checkout event, fix templating
   - sha: cebf219e0dd4cadc120ac480180e0957d862b4de
