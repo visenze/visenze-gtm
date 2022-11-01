@@ -3,9 +3,11 @@ homepage: "https://www.visenze.com"
 documentation: "https://ref-docs.visenze.com/reference/widget-setup"
 versions:
   # Latest version
+  - sha: 53efa329174d1d30af27bb84252a8d58125a3f11
+    changeNotes: v0.1.1 - Integrate persistent debug mode for gtm template
+  # Older versions
   - sha: f2485aecddc58fae6a06b5698d7ed05d9e75665f
     changeNotes: remove Product Page view integration option
-  # Older versions
   - sha: 7588fa5d547f3e1351f0bc5bfaeb5b328a59fb0d
     changeNotes: Skip fetching of widget prior to deploy-configs, add template for staging
   - sha: 282d8c6e8b9e585d340d438db7a8c81b8cfc719d
