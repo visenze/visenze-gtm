@@ -224,13 +224,17 @@ const getQueryParameters = require('getQueryParameters');
 const callLater = require('callLater');
 const getUrl = require('getUrl');
 
-const SCRIPT_VERSION = '0.1.0';
+const SCRIPT_VERSION = '0.1.1';
 const CONTAINER_VERSION = getContainerVersion();
 
+// window layer variables
 const VS_LAYER_REF = 'visenzeLayer';
-const LAST_CLICK_REF = 'visenze_widget_last_click';
 const APP_DEPLOY_CONFIGS_REF = 'visenzeAppDeployConfigs';
 const WIDGET_PID_REF = 'visenzeWidgetsPid';
+
+// localstorage variables
+const LAST_CLICK_REF = 'visenze_widget_last_click';
+const VS_DEBUG_ID_REF = 'visenzeDebugId';
 
 const env = CONTAINER_VERSION.environmentName === 'staging' || data.env === 'staging' ? 'staging' : 'production';
 const appType = 'vsr';
@@ -368,11 +372,16 @@ const initWidget = () => {
 
   let deployScriptUrl = paramsMap[env][appType].deployConfigUrl + '/v1/deploy-configs?app_key=' + appKey + '&gtm_deploy=true&gtm_v=' + SCRIPT_VERSION;
 
-  const previewId = getQueryParameters('visenzePreviewId');
-  if (previewId) {
-    deployScriptUrl = deployScriptUrl + '&preview_id=' + previewId; 
-  }
-  const debugId = getQueryParameters('visenzeDebugId');
+  const getDebugId = () => {
+    const queryParam = getQueryParameters('visenzeDebugId');
+    if (queryParam) {
+      localStorage.setItem(VS_DEBUG_ID_REF, queryParam);
+      return queryParam;
+    }
+    return localStorage.getItem(VS_DEBUG_ID_REF);
+  };
+
+  const debugId = getDebugId();
   if (debugId) {
     deployScriptUrl = deployScriptUrl + '&debug_id=' + debugId; 
   }
@@ -384,7 +393,7 @@ const initWidget = () => {
   };
 
   const failureFn = () => {
-    logWithError({ msg: 'unable to load deploy script', url: deployScriptUrl, previewId: previewId });
+    logWithError({ msg: 'unable to load deploy script', url: deployScriptUrl, debugId: debugId });
     data.gtmOnFailure();
   };
 
@@ -426,6 +435,7 @@ const sendWidgetEvent = (eventName, eventsArr) => {
 
   for (const ev of eventsArr) {
     ev.queryId = storedEvent.queryId;
+    ev.gtm_v = SCRIPT_VERSION;
   }
 
   // initialize visenzeLayer if not available
@@ -1017,7 +1027,7 @@ ___WEB_PERMISSIONS___
                 "mapValue": [
                   {
                     "type": 1,
-                    "string": "vsLastClickEvent"
+                    "string": "visenzeDebugId"
                   },
                   {
                     "type": 8,
@@ -1026,37 +1036,6 @@ ___WEB_PERMISSIONS___
                   {
                     "type": 8,
                     "boolean": true
-                  }
-                ]
-              },
-              {
-                "type": 3,
-                "mapKey": [
-                  {
-                    "type": 1,
-                    "string": "key"
-                  },
-                  {
-                    "type": 1,
-                    "string": "read"
-                  },
-                  {
-                    "type": 1,
-                    "string": "write"
-                  }
-                ],
-                "mapValue": [
-                  {
-                    "type": 1,
-                    "string": "vs_last_clicked_result"
-                  },
-                  {
-                    "type": 8,
-                    "boolean": true
-                  },
-                  {
-                    "type": 8,
-                    "boolean": false
                   }
                 ]
               },
