@@ -198,7 +198,7 @@ const getQueryParameters = require('getQueryParameters');
 const callLater = require('callLater');
 const getUrl = require('getUrl');
 
-const SCRIPT_VERSION = '0.1.1';
+const SCRIPT_VERSION = '0.1.2';
 const CONTAINER_VERSION = getContainerVersion();
 
 // window layer variables
@@ -233,6 +233,32 @@ const paramsMap = {
 };
 const vsLayerPushMethod = VS_LAYER_REF + '.push';
 
+const appKey = data.appKey;
+
+
+const getAppDeployConfigsPlacement = (placementIdStr, useDefaultPlacement) => {
+  const appDeployConfigs = copyFromWindow(APP_DEPLOY_CONFIGS_REF);
+  const placements = appDeployConfigs && appDeployConfigs[appKey] && appDeployConfigs[appKey].placement_previews;
+
+  if (placements) {
+    // if placementIdStr is specified, try to find matching placement from array by placement_id
+    if (placementIdStr) {
+      const placementId = makeNumber(placementIdStr);
+    for (const p of placements) {
+      if (p.placement_id === placementId) {
+        return p;
+      }
+      }
+    }
+
+    // fallback: return first placement if useDefaultPlacement is set to true
+    if (useDefaultPlacement) {
+      return placements[0] || null;
+    }
+  }
+
+  return null;
+};
 
 const getPlacementObj = () => {
   const storedEvent = JSON.parse(localStorage.getItem(LAST_CLICK_REF));
@@ -241,18 +267,7 @@ const getPlacementObj = () => {
     return null;
   }
 
-  const placementId = makeNumber(placementIdStr);
-  const appDeployConfigs = copyFromWindow(APP_DEPLOY_CONFIGS_REF);
-  const placements = appDeployConfigs && appDeployConfigs[data.appKey] && appDeployConfigs[data.appKey].placement_previews;
-  if (placements) {
-    for (const p of placements) {
-      if (p.placement_id === placementId) {
-        return p;
-      }
-    }
-  }
-
-  return null;
+  return getAppDeployConfigsPlacement(placementIdStr, false);
 };
 
 
@@ -341,7 +356,6 @@ log({
 
 
 const initWidget = () => {
-  const appKey = data.appKey;
   const productId = getProductId(data.widgetPid, null);
 
   let deployScriptUrl = paramsMap[env][appType].deployConfigUrl + '/v1/deploy-configs?app_key=' + appKey + '&gtm_deploy=true&gtm_v=' + SCRIPT_VERSION;
@@ -393,7 +407,7 @@ const shouldDeployTypeSendEvent = () => {
   const appDeployConfigs = copyFromWindow(APP_DEPLOY_CONFIGS_REF);
   log({ appDeployConfigs: appDeployConfigs });
 
-  const deployType = appDeployConfigs && appDeployConfigs[data.appKey] && appDeployConfigs[data.appKey].deploy_type_id;
+  const deployType = appDeployConfigs && appDeployConfigs[appKey] && appDeployConfigs[appKey].deploy_type_id;
   return deployType === 1 || deployType === '1';
 };
 
@@ -401,14 +415,23 @@ const sendWidgetEvent = (eventName, eventsArr) => {
   const storedEvent = JSON.parse(localStorage.getItem(LAST_CLICK_REF)) || {};
   log({ storedEvent: storedEvent });
 
-  if (!(storedEvent && storedEvent.queryId && storedEvent.placement_id)) {
+  const queryId = storedEvent.queryId;
+  let placementId = storedEvent.placement_id;
+  if (!(queryId && placementId)) {
     log('Unable to retrieve last clicked widget for event: ', eventName);
-    data.gtmOnSuccess();
+    const placement = getAppDeployConfigsPlacement('', true);
+
+    if (!placement) {
+      log('Unable to retrieve default placement for event: ', eventName);
     return;
+    }
+    placementId = makeString(placement.placement_id);
   }
 
   for (const ev of eventsArr) {
-    ev.queryId = storedEvent.queryId;
+    if (queryId) {
+      ev.query_id = storedEvent;
+    }
     ev.gtm_v = SCRIPT_VERSION;
   }
 
@@ -420,7 +443,7 @@ const sendWidgetEvent = (eventName, eventsArr) => {
   // call visenzeLayer.push method, with event
   const vsLayerBody = {
     action: 'sendEvents',
-    placementId: storedEvent.placement_id,
+    placementId: placementId,
     params: [eventName, eventsArr],
   };
   const sendEventForDeployType = shouldDeployTypeSendEvent();
