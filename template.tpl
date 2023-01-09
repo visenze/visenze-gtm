@@ -77,16 +77,19 @@ ___TEMPLATE_PARAMETERS___
     "subParams": [
       {
         "type": "TEXT",
-        "name": "widgetPid",
-        "displayName": "GTM variable for ProductId",
+        "name": "widgetPidValue",
+        "displayName": "GTM-evaluated variable for ProductId",
         "simpleValueType": true,
         "help": "Select the GTM variable that represents the hero product id that is used to load the recommendation widget",
-        "valueHint": "e.g. ecommerce.items.0.item_id",
-        "valueValidators": [
-          {
-            "type": "NON_EMPTY"
-          }
-        ]
+        "valueHint": "e.g. {{ ProductId }}"
+      },
+      {
+        "type": "TEXT",
+        "name": "widgetPid",
+        "displayName": "GTM Datalayer variable for ProductId",
+        "simpleValueType": true,
+        "help": "Select the Datalayer variable name that represents the hero product id that is used to load the recommendation widget",
+        "valueHint": "e.g. ecommerce.items.0.item_id"
       }
     ],
     "enablingConditions": [
@@ -115,6 +118,14 @@ ___TEMPLATE_PARAMETERS___
             "type": "NON_EMPTY"
           }
         ]
+      },
+      {
+        "type": "TEXT",
+        "name": "atcPidValue",
+        "displayName": "GTM Datalayer variable for ProductId",
+        "simpleValueType": true,
+        "help": "Select the Datalayer variable name that represents the product id that is added to cart",
+        "valueHint": "e.g. ecommerce.items.0.item_id"
       }
     ],
     "enablingConditions": [
@@ -192,14 +203,16 @@ const makeString = require('makeString');
 const injectScript = require('injectScript');
 const callInWindow = require('callInWindow');
 const copyFromWindow = require('copyFromWindow');
-const setInWindow = require('setInWindow');
+const setInWindowFn = require('setInWindow');
 const getContainerVersion = require('getContainerVersion');
 const getQueryParameters = require('getQueryParameters');
-const callLater = require('callLater');
 const getUrl = require('getUrl');
 
-const SCRIPT_VERSION = '0.1.2';
+const SCRIPT_VERSION = '0.1.3';
 const CONTAINER_VERSION = getContainerVersion();
+const setInWindow = (fnName, args) => {
+  setInWindowFn(fnName, args, true);
+};
 
 // window layer variables
 const VS_LAYER_REF = 'visenzeLayer';
@@ -297,7 +310,8 @@ const logWithError = (msgObj) => {
 
 
 const getFromDataLayers = (dataLayerArr, eventName, fn, fnArgs) => {
-  for (const dl of dataLayerArr) {
+  for (var i = dataLayerArr.length - 1; i >= 0; i--) {
+    const dl = dataLayerArr[i];
     // if eventName is specified, find trigger event by comparing gtmEventId with dataLayer
     if (!dl || (eventName && dl['gtm.uniqueEventId'] !== data.gtmEventId)) {
       continue;
@@ -356,7 +370,8 @@ log({
 
 
 const initWidget = () => {
-  const productId = getProductId(data.widgetPid, null);
+  // default to data.widgetPidValue, or data.atcPidValue for ATC event, if it exists
+  const productId = data.widgetPidValue || data.atcPidValue || getProductId(data.widgetPid, null);
 
   let deployScriptUrl = paramsMap[env][appType].deployConfigUrl + '/v1/deploy-configs?app_key=' + appKey + '&gtm_deploy=true&gtm_v=' + SCRIPT_VERSION;
 
