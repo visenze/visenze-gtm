@@ -208,7 +208,7 @@ const getContainerVersion = require('getContainerVersion');
 const getQueryParameters = require('getQueryParameters');
 const getUrl = require('getUrl');
 
-const SCRIPT_VERSION = '0.1.3';
+const SCRIPT_VERSION = '0.1.4';
 const CONTAINER_VERSION = getContainerVersion();
 const setInWindow = (fnName, args) => {
   setInWindowFn(fnName, args, true);
@@ -369,20 +369,21 @@ log({
 });
 
 
+const getDebugId = () => {
+  const queryParam = getQueryParameters('visenzeDebugId');
+  if (queryParam) {
+    localStorage.setItem(VS_DEBUG_ID_REF, queryParam);
+    return queryParam;
+  }
+  return localStorage.getItem(VS_DEBUG_ID_REF);
+};
+
+
 const initWidget = () => {
   // default to data.widgetPidValue, or data.atcPidValue for ATC event, if it exists
   const productId = data.widgetPidValue || data.atcPidValue || getProductId(data.widgetPid, null);
 
   let deployScriptUrl = paramsMap[env][appType].deployConfigUrl + '/v1/deploy-configs?app_key=' + appKey + '&gtm_deploy=true&gtm_v=' + SCRIPT_VERSION;
-
-  const getDebugId = () => {
-    const queryParam = getQueryParameters('visenzeDebugId');
-    if (queryParam) {
-      localStorage.setItem(VS_DEBUG_ID_REF, queryParam);
-      return queryParam;
-  }
-    return localStorage.getItem(VS_DEBUG_ID_REF);
-  };
 
   const debugId = getDebugId();
   if (debugId) {
@@ -450,6 +451,7 @@ const sendWidgetEvent = (eventName, eventsArr) => {
     ev.gtm_v = SCRIPT_VERSION;
   }
 
+  const debugId = getDebugId() || '';
   // initialize visenzeLayer if not available
   const vsLayerRef = copyFromWindow(VS_LAYER_REF);
   if (!vsLayerRef) {
@@ -460,6 +462,7 @@ const sendWidgetEvent = (eventName, eventsArr) => {
     action: 'sendEvents',
     placementId: placementId,
     params: [eventName, eventsArr],
+    debugId: debugId,
   };
   const sendEventForDeployType = shouldDeployTypeSendEvent();
   if (!sendEventForDeployType) {
