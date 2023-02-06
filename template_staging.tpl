@@ -472,7 +472,7 @@ const sendWidgetEvent = (eventName, eventsArr) => {
 
   for (const ev of eventsArr) {
     if (queryId) {
-      ev.query_id = storedEvent;
+      ev.query_id = queryId;
     }
     ev.gtm_v = SCRIPT_VERSION;
   }
