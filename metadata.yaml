@@ -3,9 +3,11 @@ homepage: "https://www.visenze.com"
 documentation: "https://ref-docs.visenze.com/reference/widget-setup"
 versions:
   # Latest version
+  - sha: dce5c173ba676008346a1464f0c0510864072cc3
+    changeNotes: v0.1.5 - Fix QueryId being sent in GTM template
+  # Older versions
   - sha: 5a1778b2a5b09cc5e2c07ca378c2316779db5218
     changeNotes: v0.1.4 - Send debugId during event tracking
-  # Older versions
   - sha: 618faa64b352ab579033e53a8ae07afb4d111738
     changeNotes: v0.1.3 - Integrate GTM-evaluated variable for ProductId
   - sha: d143cec876433b3f16cbbfba4c02170b055f347c
