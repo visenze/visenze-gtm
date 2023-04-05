@@ -203,7 +203,7 @@ const getContainerVersion = require('getContainerVersion');
 const getQueryParameters = require('getQueryParameters');
 const getUrl = require('getUrl');
 
-const SCRIPT_VERSION = '0.1.5';
+const SCRIPT_VERSION = '0.1.6';
 const CONTAINER_VERSION = getContainerVersion();
 const setInWindow = (fnName, args) => {
   setInWindowFn(fnName, args, true);
