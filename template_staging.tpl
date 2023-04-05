@@ -77,20 +77,20 @@ ___TEMPLATE_PARAMETERS___
     "subParams": [
       {
         "type": "TEXT",
-        "name": "widgetPidValue",
-        "displayName": "GTM-evaluated variable for ProductId",
-        "simpleValueType": true,
-        "help": "Select the GTM variable that represents the hero product id that is used to load the recommendation widget",
-        "valueHint": "e.g. {{ ProductId }}"
-      },
-      {
-        "type": "TEXT",
         "name": "widgetPid",
         "displayName": "GTM Datalayer variable for ProductId",
         "simpleValueType": true,
         "help": "Select the Datalayer variable name that represents the hero product id that is used to load the recommendation widget",
         "valueHint": "e.g. ecommerce.items.0.item_id"
-      }
+      },
+      {
+        "type": "TEXT",
+        "name": "widgetPidValue",
+        "displayName": "GTM-evaluated variable for ProductId",
+        "simpleValueType": true,
+        "help": "Select the GTM variable that represents the hero product id that is used to load the recommendation widget",
+        "valueHint": "e.g. {{ ProductId }}"
+      }      
     ],
     "enablingConditions": [
       {
@@ -112,12 +112,7 @@ ___TEMPLATE_PARAMETERS___
         "displayName": "GTM variable for ProductId",
         "simpleValueType": true,
         "help": "Select the GTM variable that represents the product id that is added to cart",
-        "valueHint": "e.g. ecommerce.items.0.item_id",
-        "valueValidators": [
-          {
-            "type": "NON_EMPTY"
-          }
-        ]
+        "valueHint": "e.g. ecommerce.items.0.item_id"
       },
       {
         "type": "TEXT",
@@ -125,7 +120,7 @@ ___TEMPLATE_PARAMETERS___
         "displayName": "GTM Datalayer variable for ProductId",
         "simpleValueType": true,
         "help": "Select the Datalayer variable name that represents the product id that is added to cart",
-        "valueHint": "e.g. ecommerce.items.0.item_id"
+        "valueHint": "e.g. {{ ProductId }}"
       }
     ],
     "enablingConditions": [
@@ -234,7 +229,7 @@ const getContainerVersion = require('getContainerVersion');
 const getQueryParameters = require('getQueryParameters');
 const getUrl = require('getUrl');
 
-const SCRIPT_VERSION = '0.1.4';
+const SCRIPT_VERSION = '0.1.5';
 const CONTAINER_VERSION = getContainerVersion();
 const setInWindow = (fnName, args) => {
   setInWindowFn(fnName, args, true);
