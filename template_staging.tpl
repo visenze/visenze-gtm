@@ -229,7 +229,7 @@ const getContainerVersion = require('getContainerVersion');
 const getQueryParameters = require('getQueryParameters');
 const getUrl = require('getUrl');
 
-const SCRIPT_VERSION = '0.1.6';
+const SCRIPT_VERSION = '0.1.7';
 const CONTAINER_VERSION = getContainerVersion();
 const setInWindow = (fnName, args) => {
   setInWindowFn(fnName, args, true);
@@ -278,10 +278,10 @@ const getAppDeployConfigsPlacement = (placementIdStr, useDefaultPlacement) => {
     // if placementIdStr is specified, try to find matching placement from array by placement_id
     if (placementIdStr) {
       const placementId = makeNumber(placementIdStr);
-    for (const p of placements) {
-      if (p.placement_id === placementId) {
-        return p;
-      }
+      for (const p of placements) {
+        if (p.placement_id === placementId) {
+          return p;
+        }
       }
     }
 
@@ -459,10 +459,11 @@ const sendWidgetEvent = (eventName, eventsArr) => {
     const placement = getAppDeployConfigsPlacement('', true);
 
     if (!placement) {
-      log('Unable to retrieve default placement for event: ', eventName);
-    return;
+      logWithError('Unable to retrieve default placement for event: ', eventName);
+      placementId = '';
+    } else {
+      placementId = makeString(placement.placement_id);
     }
-    placementId = makeString(placement.placement_id);
   }
 
   for (const ev of eventsArr) {
