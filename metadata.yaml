@@ -3,9 +3,11 @@ homepage: "https://www.visenze.com"
 documentation: "https://ref-docs.visenze.com/reference/widget-setup"
 versions:
   # Latest version
+  - sha: b6dd01c47c5d9b173d5d4d3a7ef5a35b829f73c6
+    changeNotes: v0.1.7 - Remove dependency on Widget loading before ATC & Transaction event
+  # Older versions
   - sha: a48a6b310cc9a01ef6b6afda1c4e5c5a77d0b429
     changeNotes: v0.1.6 - Fix order and validation of template parameters
-  # Older versions
   - sha: dce5c173ba676008346a1464f0c0510864072cc3
     changeNotes: v0.1.5 - Fix QueryId being sent in GTM template
   - sha: 5a1778b2a5b09cc5e2c07ca378c2316779db5218
