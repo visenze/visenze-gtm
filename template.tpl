@@ -202,8 +202,9 @@ const setInWindowFn = require('setInWindow');
 const getContainerVersion = require('getContainerVersion');
 const getQueryParameters = require('getQueryParameters');
 const getUrl = require('getUrl');
+const getType = require('getType');
 
-const SCRIPT_VERSION = '0.1.7';
+const SCRIPT_VERSION = '0.1.8';
 const CONTAINER_VERSION = getContainerVersion();
 const setInWindow = (fnName, args) => {
   setInWindowFn(fnName, args, true);
@@ -330,7 +331,7 @@ const getFieldByNestedKey = (dl, keys) => {
   const key = keys[0];
 
   const keyIntValue = makeNumber(key);
-  if ((keyIntValue || keyIntValue === 0) && typeof dl !== 'string') {
+  if ((keyIntValue || keyIntValue === 0) && getType(dl) === 'array') {
     for (const el of dl) {
       const productIdToAdd = keys.length === 1 ? makeString(el) : getFieldByNestedKey(el, keys.slice(1));
       productId = productId + (productId ? ',' : '') + productIdToAdd;
