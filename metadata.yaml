@@ -3,9 +3,11 @@ homepage: "https://www.visenze.com"
 documentation: "https://ref-docs.visenze.com/reference/widget-setup"
 versions:
   # Latest version
+  - sha: 0ee70a1aa159cfd6c5410eca964b567ed4f38884
+    changeNotes: v0.1.9 - Fix reading GTM-evaluated pid for atc event, add logs in debug mode
+  # Older versions
   - sha: 457aafb871500cb037a415d1a56ca965738fe011
     changeNotes: v0.1.8 - Fix pid parsing for objects with numeric keys
-  # Older versions
   - sha: b6dd01c47c5d9b173d5d4d3a7ef5a35b829f73c6
     changeNotes: v0.1.7 - Remove dependency on Widget loading before ATC & Transaction event
   - sha: a48a6b310cc9a01ef6b6afda1c4e5c5a77d0b429
