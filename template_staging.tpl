@@ -230,7 +230,7 @@ const getQueryParameters = require('getQueryParameters');
 const getUrl = require('getUrl');
 const getType = require('getType');
 
-const SCRIPT_VERSION = '0.1.8';
+const SCRIPT_VERSION = '0.1.9';
 const CONTAINER_VERSION = getContainerVersion();
 const setInWindow = (fnName, args) => {
   setInWindowFn(fnName, args, true);
@@ -269,6 +269,7 @@ const paramsMap = {
 const vsLayerPushMethod = VS_LAYER_REF + '.push';
 
 const appKey = data.appKey;
+const isVsDebugMode = !!getQueryParameters('visenzeDebugId');
 
 
 const getAppDeployConfigsPlacement = (placementIdStr, useDefaultPlacement) => {
@@ -307,7 +308,7 @@ const getPlacementObj = () => {
 
 
 const log = (msg) => {
-  if (env === 'staging' || CONTAINER_VERSION.debugMode || CONTAINER_VERSION.previewMode) {
+  if (env === 'staging' || CONTAINER_VERSION.debugMode || CONTAINER_VERSION.previewMode || isVsDebugMode) {
     logToConsole(msg);
   }
 };
@@ -403,7 +404,7 @@ log({
 
 const initWidget = () => {
   // default to data.widgetPidValue, or data.atcPidValue for ATC event, if it exists
-  const productId = data.widgetPidValue || data.atcPidValue || getProductId(data.widgetPid, null);
+  const productId = data.widgetPidValue || getProductId(data.widgetPid, null);
 
   let deployScriptUrl = paramsMap[env][appType].deployConfigUrl + '/v1/deploy-configs?app_key=' + appKey + '&gtm_deploy=true&gtm_v=' + SCRIPT_VERSION;
 
@@ -498,7 +499,7 @@ const sendWidgetEvent = (eventName, eventsArr) => {
 };
 
 const sendAtcEvent = () => {
-  const productId = getProductId(data.atcPid, data.integrationType);
+  const productId = data.atcPidValue || getProductId(data.atcPid, data.integrationType);
   if (!productId) {
     logWithError({ msg: 'event not triggered', integrationType: data.integrationType, productId: productId });
     data.gtmOnFailure();
@@ -1151,10 +1152,93 @@ ___WEB_PERMISSIONS___
 
 ___TESTS___
 
-scenarios: []
+scenarios:
+- name: ATC_invalid_atcPidValue_successEvent
+  code: |-
+    // assert productId still sent to ATC with success, even with invalid product_id value
+    const invalidPid = 'asdf';
+    const mockData = {
+      // Mocked field values
+      integrationType: 'event.atc',
+      atcPidValue: invalidPid,
+      atcPid: ''
+    };
+
+    // Call runCode to run the template's code.
+    runCode(mockData);
+
+    // Verify that the tag finished successfully.
+    assertApi('gtmOnSuccess').wasCalled();
+    const expectedBody = {
+      action: 'sendEvents',
+      placementId: 123,
+      params: [
+        'add_to_cart',
+        [{pid: invalidPid, queryId: 'xxx', gtm_v: SCRIPT_VERSION}]
+      ],
+      debugId: '',
+      deployTypeId: '1'
+    };
+- name: ATC_valid_atcPidValue_successEvent
+  code: |-
+    const mockData = {
+      // Mocked field values
+      integrationType: 'event.atc',
+      atcPidValue: '1234',
+      atcPid: ''
+    };
+
+    // Call runCode to run the template's code.
+    runCode(mockData);
+
+    // Verify that the tag finished successfully.
+    assertApi('gtmOnSuccess').wasCalled();
+- name: ATC_invalidPath_atcPid_failureEvent
+  code: |-
+    const mockData = {
+      // Mocked field values
+      integrationType: 'event.atc',
+      atcPidValue: '',
+      atcPid: 'ecommerce.items[0].id'
+    };
+
+    // Call runCode to run the template's code.
+    runCode(mockData);
+
+    // Verify that the tag finished successfully.
+    assertApi('gtmOnFailure').wasCalled();
+    assertApi('copyFromWindow').wasCalledWith('dataLayer');
+- name: ATC_validPath_atcPid_successEvent
+  code: |-
+    const mockData = {
+      // Mocked field values
+      integrationType: 'event.atc',
+      atcPidValue: '',
+      atcPid: 'ecommerce.items.0.id'
+    };
+
+    // Call runCode to run the template's code.
+    runCode(mockData);
+
+    // Verify that the tag finished successfully.
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('copyFromWindow').wasCalledWith('dataLayer');
 setup: "const localStorage = require('localStorage');\nconst json = require('JSON');\n\
   \nconst DATA_LAYER_WINDOW_FIELD = 'dataLayer';\nconst LAST_CLICK_REF = 'visenze_widget_last_click';\n\
-  \nconst transactionData = {\n  transactionId: '1234',\n  transactionAffiliation:\
+  const SCRIPT_VERSION = '0.1.9';\n\nconst atcData = {\n   \"event\": \"addToCart\"\
+  ,\n   \"ecommerce\": {\n      \"items\": [\n         {\n            \"id\": 1234,\n\
+  \            \"name\": \"PRODUCT_NAME\",\n            \"image\": \"https://www.example.com\"\
+  ,\n            \"price\": \"111.00\",\n            \"brand\": \"X\",\n         \
+  \   \"category\": \"T-shirt\",\n            \"hype\": \"No\",\n            \"variant_id\"\
+  : \"37219\",\n            \"size\": \"M\",\n            \"sku\": \"123412341234\"\
+  \n         }\n      ],\n      \"currencyCode\": \"USD\"\n   },\n};\n\nconst productData\
+  \ = {\n   \"event\": \"productDetails\",\n   \"ecommerce\": {\n      \"product\"\
+  : {\n        \"id\": 1234,\n        \"name\": \"PRODUCT_NAME\",\n        \"image\"\
+  : \"https://www.example.com\",\n        \"price\": \"111.00\",\n        \"brand\"\
+  : \"X\",\n        \"category\": \"T-shirt\",\n        \"hype\": \"No\",\n      \
+  \  \"variant_id\": \"37219\",\n        \"size\": \"M\",\n        \"sku\": \"123412341234\"\
+  ,\n        \"language\": \"en\",\n      },\n      \"currencyCode\": \"USD\"\n  \
+  \ }\n};\n\nconst transactionData = {\n  transactionId: '1234',\n  transactionAffiliation:\
   \ 'Acme Clothing',\n  transactionTotal: 38.26, \n  transactionTax: 1.29,\n  transactionShipping:\
   \ 5,\n  transactionProducts: [\n    {\n      sku: 'DD44',\n      name: 'T-Shirt',\n\
   \      category: 'Apparel',\n      price: 11.99,  \n      quantity: 1 \n    },\n\
@@ -1162,7 +1246,9 @@ setup: "const localStorage = require('localStorage');\nconst json = require('JSO
   \      price: 9.99,\n      quantity: 2\n    }\n  ]\n};\n\nconst productIdData =\
   \ {\n  'Product_SKU': 'product_123',\n};\n\nconst lastClickedEvent = {\n  queryId:\
   \ 'xxx',\n  placement_id: 123,\n};\n\n// set LocalStorage permission for LAST_CLICKED_REF\
-  \ to r/w before starting tests\nlocalStorage.setItem(LAST_CLICK_REF, json.stringify(lastClickedEvent));\n"
+  \ to r/w before starting tests\nlocalStorage.setItem(LAST_CLICK_REF, json.stringify(lastClickedEvent));\n\
+  \nmock('copyFromWindow', function(windowVar) {\n  if (windowVar === 'dataLayer')\
+  \ {\n    return [transactionData, atcData, productData];\n  }\n});\n"
 
 
 ___NOTES___
