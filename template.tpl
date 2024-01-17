@@ -204,7 +204,7 @@ const getQueryParameters = require('getQueryParameters');
 const getUrl = require('getUrl');
 const getType = require('getType');
 
-const SCRIPT_VERSION = '0.1.9';
+const SCRIPT_VERSION = '0.1.11';
 const CONTAINER_VERSION = getContainerVersion();
 const setInWindow = (fnName, args) => {
   setInWindowFn(fnName, args, true);
@@ -243,7 +243,6 @@ const paramsMap = {
 const vsLayerPushMethod = VS_LAYER_REF + '.push';
 
 const appKey = data.appKey;
-const isVsDebugMode = !!getQueryParameters('visenzeDebugId');
 
 
 const getAppDeployConfigsPlacement = (placementIdStr, useDefaultPlacement) => {
@@ -282,6 +281,7 @@ const getPlacementObj = () => {
 
 
 const log = (msg) => {
+  const isVsDebugMode = !!getQueryParameters('visenzeDebugId');
   if (env === 'staging' || CONTAINER_VERSION.debugMode || CONTAINER_VERSION.previewMode || isVsDebugMode) {
     logToConsole(msg);
   }
@@ -302,7 +302,7 @@ const logWithError = (msgObj) => {
   }
 
   // send error to gtm dataLayer with custom event name, e.g. vsError
-  callInWindow('dataLayer.push', { event: 'vsError', result: msgObj });
+  callInWindow('dataLayer.push', { event: 'vsError', result: msgObj, data: data });
 };
 
 
@@ -328,6 +328,10 @@ const getFieldByNestedKey = (dl, keys) => {
     return '';
   }
 
+  if (keys.length < 1) {
+    return dl;
+  }
+
   let productId = '';
   const key = keys[0];
 
@@ -349,11 +353,50 @@ const getFieldByNestedKey = (dl, keys) => {
   return keys.length > 1 ? getFieldByNestedKey(nestedValue, keys.slice(1)) : nestedValue;
 };
 
-const getProductId = (productIdField, eventName) => {
+const toValidStringValue = (fieldName) => {
+  const val = data[fieldName];
+  const valType = getType(val);
+  if (valType === 'string') {
+    return val;
+  } else if (valType === 'number') {
+    logWithError({ msg: 'field value is of type number, possible field input error', value: val, field_name: fieldName });
+    return val;
+  } else if (valType === 'undefined' || valType === 'null') {
+    logWithError({ msg: 'unable to find field value', value: val, field_name: fieldName });
+    return '';
+  } else {
+    logWithError({ msg: 'invalid field value type', value: val, field_name: fieldName });
+    return '';
+  }
+};
+
+const validatePidType = (pid) => {
+  const pidType = getType(pid);
+  if (pidType === 'object' || pidType === 'array' || pidType === 'function') {
+    logWithError({ msg: 'invalid productId value', type: pidType, value: pid });
+    return false;
+  }
+
+  return true;
+};
+
+const getProductId = (gtmVarValue, productIdField, eventName) => {
+  if (gtmVarValue) {
+    return validatePidType(gtmVarValue) ? makeString(gtmVarValue) : '';
+  }
+
+  if (!productIdField) {
+    logWithError({ msg: 'Input field for retrieving productId is empty' });
+    return '';
+  } else if (getType(productIdField) !== 'string') {
+    logWithError({ msg: 'Invalid input type for product_id field; string input expected', value: productIdField });
+    return '';
+  }
   const dataLayerArr = copyFromWindow('dataLayer');
   const objKeys = productIdField.split('.');
 
-  return getFromDataLayers(dataLayerArr, eventName, getFieldByNestedKey, objKeys);
+  const pid = getFromDataLayers(dataLayerArr, eventName, getFieldByNestedKey, objKeys);
+  return validatePidType(pid) ? makeString(pid) : '';
 };
 
 
@@ -377,8 +420,8 @@ const getDebugId = () => {
 
 
 const initWidget = () => {
-  // default to data.widgetPidValue, or data.atcPidValue for ATC event, if it exists
-  const productId = data.widgetPidValue || getProductId(data.widgetPid, null);
+  // default to data.widgetPidValue if it exists
+  const productId = getProductId(data.widgetPidValue, data.widgetPid, null);
 
   let deployScriptUrl = paramsMap[env][appType].deployConfigUrl + '/v1/deploy-configs?app_key=' + appKey + '&gtm_deploy=true&gtm_v=' + SCRIPT_VERSION;
 
@@ -473,7 +516,7 @@ const sendWidgetEvent = (eventName, eventsArr) => {
 };
 
 const sendAtcEvent = () => {
-  const productId = data.atcPidValue || getProductId(data.atcPid, data.integrationType);
+  const productId = getProductId(data.atcPidValue, data.atcPid, data.integrationType);
   if (!productId) {
     logWithError({ msg: 'event not triggered', integrationType: data.integrationType, productId: productId });
     data.gtmOnFailure();
@@ -489,24 +532,35 @@ const sendTransactionEventForProductArr = (productArr) => {
   const EVENT_NAME = 'transaction';
   const eventsArr = [];
 
+  const toValidNumber = (val, defaultVal, fieldName) => {
+    const valType = getType(val);
+    if (valType === 'number') {
+      return val;
+    } else if (valType === 'string') {
+      logWithError({ msg: 'field value is of type string, possible conversion failure to number', value: val, field_name: fieldName });
+      return makeNumber(val || defaultVal);
+    } else if (valType === 'undefined' || valType === 'null') {
+      logWithError({ msg: 'unable to find field value', value: val, field_name: fieldName });
+      return defaultVal;
+    } else {
+      logWithError({ msg: 'invalid field value type', value: val, field_name: fieldName });
+      return defaultVal;
+    }
+  };
+
   for (const productEl of productArr) {
-    const pidField = data.transProductArrSkuField;
+    const pidField = toValidStringValue('transProductArrSkuField');
     const pid = productEl && productEl[pidField];
-    if (!pid) {
+    if (!pid || !validatePidType(pid)) {
       logWithError({ msg: 'unable to find productId in product', field: pidField, product: productEl });
       continue;
     }
 
-    const qtyStr = productEl[data.transProductArrQtyField];
-    const priceStr = productEl[data.transProductArrPriceField];
-
-    if (!qtyStr || !priceStr) {
-      logWithError({ msg: 'unable to find quantity or price field', quantity_field: data.transProductArrQtyField, price_field: data.transProductArrPriceField });
-    }
-
-    const qty = makeNumber(qtyStr || '1');
-    const price = makeNumber(priceStr || '0');
-    eventsArr.push({ pid: pid, value: qty * price });
+    const qtyField = toValidStringValue('transProductArrQtyField');
+    const priceField = toValidStringValue('transProductArrPriceField');
+    const qty = toValidNumber(productEl[qtyField], 1, 'quantity');
+    const price = toValidNumber(productEl[priceField], 0, 'price');
+    eventsArr.push({ pid: makeString(pid), value: qty * price });
   }
 
   sendWidgetEvent(EVENT_NAME, eventsArr);
@@ -519,7 +573,12 @@ const sendTransactionEvent = () => {
   const productArr = getFromDataLayers(dataLayerArr, data.integrationType, getFieldByNestedKey, productArrFieldKeys);
 
   if (!productArr || !productArr.length) {
-    logWithError({ msg: 'unable to get products for transaction event', field: data.productArrFieldName });
+    logWithError({ msg: 'unable to get products for transaction event', field: data.transProductArrFieldName });
+    data.gtmOnFailure();
+    return;
+  }
+  if (getType(productArr) !== 'array') {
+    logWithError({ msg: 'expected transaction object is not of type array', value: productArr });
     data.gtmOnFailure();
     return;
   }
@@ -1182,6 +1241,7 @@ scenarios:
     // Verify that the tag finished successfully.
     assertApi('gtmOnFailure').wasCalled();
     assertApi('copyFromWindow').wasCalledWith('dataLayer');
+    assertApi('logToConsole').wasCalledWith({"msg":"event not triggered","integrationType":"event.atc","productId":""});
 - name: ATC_validPath_atcPid_successEvent
   code: |-
     const mockData = {
@@ -1197,32 +1257,167 @@ scenarios:
     // Verify that the tag finished successfully.
     assertApi('gtmOnSuccess').wasCalled();
     assertApi('copyFromWindow').wasCalledWith('dataLayer');
+- name: ATC_atcPidValue_invalidType_failureEvent
+  code: |-
+    // assert ATC event not triggered successfully when evaluated GTM variable is of invalid type
+    const invalidPid = {"product_id": "this is an object not a pid"};
+    const mockData = {
+      // Mocked field values
+      integrationType: 'event.atc',
+      atcPidValue: invalidPid,
+      atcPid: ''
+    };
+
+    // Call runCode to run the template's code.
+    runCode(mockData);
+
+    assertApi('gtmOnFailure').wasCalled();
+    assertApi('copyFromWindow').wasCalledWith('dataLayer');
+    assertApi('logToConsole').wasCalledWith({"msg":"invalid productId value","type":"object","value":{"product_id":"this is an object not a pid"}});
+- name: initWidget_widgetPidValue_invalidType_successEvent_with_errorLog
+  code: |-
+    // assert initWidget event triggered successfully, but with empty pid, when evaluated GTM variable is of invalid type
+    const invalidPid = {"product_id": "this is an object not a pid"};
+    const mockData = {
+      // Mocked field values
+      integrationType: 'widget',
+      widgetPidValue: invalidPid,
+      widgetPid: ''
+    };
+
+    // Call runCode to run the template's code.
+    runCode(mockData);
+
+    assertApi('copyFromWindow').wasCalledWith('dataLayer');
+    assertApi('logToConsole').wasCalledWith({"msg":"invalid productId value","type":"object","value":{"product_id":"this is an object not a pid"}});
+- name: transaction_arrFieldName_invalidType_failureEvent
+  code: |
+    // assert transaction event fails when field name of array is invalid
+    const invalidArrFieldName = 'transactionId';
+    const mockData = {
+      // Mocked field values
+      integrationType: 'event.trans',
+      transProductArrFieldName: invalidArrFieldName,
+      transProductArrSkuField: 'sku',
+      transProductArrQtyField: 'price',
+      transProductArrPriceField: 'quantity',
+    };
+
+    // Call runCode to run the template's code.
+    runCode(mockData);
+
+    // Verify that the tag finished with failure.
+    assertApi('gtmOnFailure').wasCalled();
+    assertApi('logToConsole').wasCalledWith({"msg":"expected transaction object is not of type array","value":"1234"});
+- name: transaction_arrSkuField_invalid_successEvent
+  code: |
+    // assert transaction event executes with success, with no products sent, when field name of sku field is invalid
+    const invalidSkuFieldName = 'sku_invalid';
+    const mockData = {
+      // Mocked field values
+      integrationType: 'event.trans',
+      transProductArrFieldName: 'transactionProducts',
+      transProductArrSkuField: invalidSkuFieldName,
+      transProductArrQtyField: 'price',
+      transProductArrPriceField: 'quantity',
+    };
+
+    // Call runCode to run the template's code.
+    runCode(mockData);
+
+    // Verify that the tag finished successfully.
+    assertApi('gtmOnSuccess').wasCalled();
+
+    // assert error logged to GTM for both products
+    assertApi('logToConsole').wasCalledWith({"msg":"unable to find productId in product","field":"sku_invalid","product":{"sku":"DD44","name":"T-Shirt","category":"Apparel","price":11.99,"quantity":1,"invalidQtyValue":{"quantity":1},"invalidPriceValue":[11.99]}});
+
+    assertApi('logToConsole').wasCalledWith({"msg":"unable to find productId in product","field":"sku_invalid","product":{"sku":"AA1243544","name":"Socks","category":"Apparel","price":9.99,"quantity":2,"invalidQtyValue":{"quantity":2},"invalidPriceValue":[9.99]}});
+- name: transaction_arrQtyField_invalidValue_successEvent
+  code: |-
+    // assert transaction event executes with success, and products sent with value 0, when field value of quantity field is invalid
+    const mockData = {
+      // Mocked field values
+      integrationType: 'event.trans',
+      transProductArrFieldName: 'transactionProducts',
+      transProductArrSkuField: 'sku',
+      transProductArrQtyField: 'price',
+      transProductArrPriceField: 'invalidQtyValue', // refer to mock data; field value here is of type object instead of number
+    };
+
+    // Call runCode to run the template's code.
+    runCode(mockData);
+
+    // Verify that the tag finished successfully.
+    assertApi('gtmOnSuccess').wasCalled();
+
+    // assert value pushed is zero
+    assertApi('callInWindow').wasCalledWith(
+      'visenzeLayer.push',
+      {"action":"sendEvents","placementId":123,"params":["transaction",[{"pid":"DD44","value":0,"query_id":"xxx","gtm_v":SCRIPT_VERSION},{"pid":"AA1243544","value":0,"query_id":"xxx","gtm_v":SCRIPT_VERSION}]],"debugId":"","deployTypeId":"1"}
+    );
+
+    // assert error logged to GTM for both products
+    assertApi('logToConsole').wasCalledWith({"msg":"invalid field value type","value":{"quantity":1},"field_name":"price"});
+
+    assertApi('logToConsole').wasCalledWith({"msg":"invalid field value type","value":{"quantity":2},"field_name":"price"});
+- name: transaction_arrPriceField_invalidValue_successEvent
+  code: |-
+    // assert transaction event executes with success, and products sent with value 0, when field value of price field is invalid
+    const mockData = {
+      // Mocked field values
+      integrationType: 'event.trans',
+      transProductArrFieldName: 'transactionProducts',
+      transProductArrSkuField: 'sku',
+      transProductArrQtyField: 'invalidPriceValue', // refer to mock data; field value here is of type array instead of number
+      transProductArrPriceField: 'qty',
+    };
+
+    // Call runCode to run the template's code.
+    runCode(mockData);
+
+    // Verify that the tag finished successfully.
+    assertApi('gtmOnSuccess').wasCalled();
+
+    // assert value pushed is zero
+    assertApi('callInWindow').wasCalledWith(
+      'visenzeLayer.push',
+      {"action":"sendEvents","placementId":123,"params":["transaction",[{"pid":"DD44","value":0,"query_id":"xxx","gtm_v":SCRIPT_VERSION},{"pid":"AA1243544","value":0,"query_id":"xxx","gtm_v":SCRIPT_VERSION}]],"debugId":"","deployTypeId":"1"}
+    );
+
+    // assert error logged to GTM for both products
+    assertApi('logToConsole').wasCalledWith({"msg":"invalid field value type","value":[11.99],"field_name":"quantity"});
+
+    assertApi('logToConsole').wasCalledWith({"msg":"invalid field value type","value":[9.99],"field_name":"quantity"});
 setup: "const localStorage = require('localStorage');\nconst json = require('JSON');\n\
   \nconst DATA_LAYER_WINDOW_FIELD = 'dataLayer';\nconst LAST_CLICK_REF = 'visenze_widget_last_click';\n\
-  const SCRIPT_VERSION = '0.1.9';\n\nconst atcData = {\n   \"event\": \"addToCart\"\
-  ,\n   \"ecommerce\": {\n      \"items\": [\n         {\n            \"id\": 1234,\n\
-  \            \"name\": \"PRODUCT_NAME\",\n            \"image\": \"https://www.example.com\"\
-  ,\n            \"price\": \"111.00\",\n            \"brand\": \"X\",\n         \
-  \   \"category\": \"T-shirt\",\n            \"hype\": \"No\",\n            \"variant_id\"\
-  : \"37219\",\n            \"size\": \"M\",\n            \"sku\": \"123412341234\"\
-  \n         }\n      ],\n      \"currencyCode\": \"USD\"\n   },\n};\n\nconst productData\
-  \ = {\n   \"event\": \"productDetails\",\n   \"ecommerce\": {\n      \"product\"\
-  : {\n        \"id\": 1234,\n        \"name\": \"PRODUCT_NAME\",\n        \"image\"\
-  : \"https://www.example.com\",\n        \"price\": \"111.00\",\n        \"brand\"\
-  : \"X\",\n        \"category\": \"T-shirt\",\n        \"hype\": \"No\",\n      \
-  \  \"variant_id\": \"37219\",\n        \"size\": \"M\",\n        \"sku\": \"123412341234\"\
-  ,\n        \"language\": \"en\",\n      },\n      \"currencyCode\": \"USD\"\n  \
-  \ }\n};\n\nconst transactionData = {\n  transactionId: '1234',\n  transactionAffiliation:\
-  \ 'Acme Clothing',\n  transactionTotal: 38.26, \n  transactionTax: 1.29,\n  transactionShipping:\
-  \ 5,\n  transactionProducts: [\n    {\n      sku: 'DD44',\n      name: 'T-Shirt',\n\
-  \      category: 'Apparel',\n      price: 11.99,  \n      quantity: 1 \n    },\n\
-  \    {\n      sku: 'AA1243544',\n      name: 'Socks',\n      category: 'Apparel',\n\
-  \      price: 9.99,\n      quantity: 2\n    }\n  ]\n};\n\nconst productIdData =\
-  \ {\n  'Product_SKU': 'product_123',\n};\n\nconst lastClickedEvent = {\n  queryId:\
-  \ 'xxx',\n  placement_id: 123,\n};\n\n// set LocalStorage permission for LAST_CLICKED_REF\
-  \ to r/w before starting tests\nlocalStorage.setItem(LAST_CLICK_REF, json.stringify(lastClickedEvent));\n\
-  \nmock('copyFromWindow', function(windowVar) {\n  if (windowVar === 'dataLayer')\
-  \ {\n    return [transactionData, atcData, productData];\n  }\n});\n"
+  // NOTE: TODO: update script_version for each new version\n// to ensure unit tests\
+  \ which validate gtm_v pass\nconst SCRIPT_VERSION = '0.1.11';\n\nconst atcData =\
+  \ {\n   \"event\": \"addToCart\",\n   \"ecommerce\": {\n      \"items\": [\n   \
+  \      {\n            \"id\": 1234,\n            \"name\": \"PRODUCT_NAME\",\n \
+  \           \"image\": \"https://www.example.com\",\n            \"price\": \"111.00\"\
+  ,\n            \"brand\": \"X\",\n            \"category\": \"T-shirt\",\n     \
+  \       \"hype\": \"No\",\n            \"variant_id\": \"37219\",\n            \"\
+  size\": \"M\",\n            \"sku\": \"123412341234\"\n         }\n      ],\n  \
+  \    \"currencyCode\": \"USD\"\n   },\n};\n\nconst productData = {\n   \"event\"\
+  : \"productDetails\",\n   \"ecommerce\": {\n      \"product\": {\n        \"id\"\
+  : 1234,\n        \"name\": \"PRODUCT_NAME\",\n        \"image\": \"https://www.example.com\"\
+  ,\n        \"price\": \"111.00\",\n        \"brand\": \"X\",\n        \"category\"\
+  : \"T-shirt\",\n        \"hype\": \"No\",\n        \"variant_id\": \"37219\",\n\
+  \        \"size\": \"M\",\n        \"sku\": \"123412341234\",\n        \"language\"\
+  : \"en\",\n      },\n      \"currencyCode\": \"USD\"\n   }\n};\n\nconst transactionData\
+  \ = {\n  transactionId: '1234',\n  transactionAffiliation: 'Acme Clothing',\n  transactionTotal:\
+  \ 38.26, \n  transactionTax: 1.29,\n  transactionShipping: 5,\n  transactionProducts:\
+  \ [\n    {\n      sku: 'DD44',\n      name: 'T-Shirt',\n      category: 'Apparel',\n\
+  \      price: 11.99,  \n      quantity: 1,\n      invalidQtyValue: {\"quantity\"\
+  : 1},\n      invalidPriceValue: [11.99],\n    },\n    {\n      sku: 'AA1243544',\n\
+  \      name: 'Socks',\n      category: 'Apparel',\n      price: 9.99,\n      quantity:\
+  \ 2,\n      invalidQtyValue: {\"quantity\": 2},\n      invalidPriceValue: [9.99],\n\
+  \    }\n  ]\n};\n\nconst productIdData = {\n  'Product_SKU': 'product_123',\n};\n\
+  \nconst lastClickedEvent = {\n  queryId: 'xxx',\n  placement_id: 123,\n};\n\n//\
+  \ set LocalStorage permission for LAST_CLICKED_REF to r/w before starting tests\n\
+  localStorage.setItem(LAST_CLICK_REF, json.stringify(lastClickedEvent));\n\nmock('copyFromWindow',\
+  \ function(windowVar) {\n  if (windowVar === 'dataLayer') {\n    return [transactionData,\
+  \ atcData, productData];\n  }\n});\n"
 
 
 ___NOTES___
