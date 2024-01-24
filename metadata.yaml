@@ -3,6 +3,8 @@ homepage: "https://www.visenze.com"
 documentation: "https://ref-docs.visenze.com/reference/widget-setup"
 versions:
   # Latest version
+  - sha: b71a82d8004a2a75c58e76dc501ed9720a781faf
+    changeNotes: v0.1.11 - Error handling, GTM tests for erroneous inputs
   - sha: 0ee70a1aa159cfd6c5410eca964b567ed4f38884
     changeNotes: v0.1.9 - Fix reading GTM-evaluated pid for atc event, add logs in debug mode
   # Older versions
