@@ -230,7 +230,7 @@ const getQueryParameters = require('getQueryParameters');
 const getUrl = require('getUrl');
 const getType = require('getType');
 
-const SCRIPT_VERSION = '0.1.11';
+const SCRIPT_VERSION = '0.2.0';
 const CONTAINER_VERSION = getContainerVersion();
 const setInWindow = (fnName, args) => {
   setInWindowFn(fnName, args, true);
@@ -447,7 +447,7 @@ const initWidget = () => {
   // default to data.widgetPidValue if it exists
   const productId = getProductId(data.widgetPidValue, data.widgetPid, null);
 
-  let deployScriptUrl = paramsMap[env][appType].deployConfigUrl + '/v1/deploy-configs?app_key=' + appKey + '&gtm_deploy=true&gtm_v=' + SCRIPT_VERSION;
+  let deployScriptUrl = paramsMap[env][appType].deployConfigUrl + '/v2/deploy-configs?app_key=' + appKey + '&gtm_deploy=true&gtm_v=' + SCRIPT_VERSION;
 
   const debugId = getDebugId();
   if (debugId) {
@@ -1421,7 +1421,7 @@ scenarios:
 setup: "const localStorage = require('localStorage');\nconst json = require('JSON');\n\
   \nconst DATA_LAYER_WINDOW_FIELD = 'dataLayer';\nconst LAST_CLICK_REF = 'visenze_widget_last_click';\n\
   // NOTE: TODO: update script_version for each new version\n// to ensure unit tests\
-  \ which validate gtm_v pass\nconst SCRIPT_VERSION = '0.1.11';\n\nconst atcData =\
+  \ which validate gtm_v pass\nconst SCRIPT_VERSION = '0.2.0';\n\nconst atcData =\
   \ {\n   \"event\": \"addToCart\",\n   \"ecommerce\": {\n      \"items\": [\n   \
   \      {\n            \"id\": 1234,\n            \"name\": \"PRODUCT_NAME\",\n \
   \           \"image\": \"https://www.example.com\",\n            \"price\": \"111.00\"\
