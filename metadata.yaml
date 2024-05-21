@@ -3,9 +3,11 @@ homepage: "https://www.visenze.com"
 documentation: "https://ref-docs.visenze.com/reference/widget-setup"
 versions:
   # Latest version
+  - sha: ba8f868cba48acc9484f6fe5dcfb1b8af03cc1ba
+    changeNotes: v0.2.1 - encode URI components
+  # Older versions
   - sha: ee582020557aa61eee93caf6533e06010a679f2f
     changeNotes: v0.2.0 - use v2 widget deploy configs for GTM template
-  # Older versions
   - sha: b71a82d8004a2a75c58e76dc501ed9720a781faf
     changeNotes: v0.1.11 - Error handling, GTM tests for erroneous inputs
   - sha: 0ee70a1aa159cfd6c5410eca964b567ed4f38884
